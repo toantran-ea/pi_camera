@@ -6,7 +6,6 @@ import locale
 from time import sleep
 from datetime import datetime
 from subprocess import call
-from daemon import Daemon
 
 from dropbox import client, rest, session
 
@@ -19,7 +18,10 @@ class Uploader(threading.Thread):
 
 	def run(self):
 		print "start uploading " + self.image_path
-		self.dropbox_client.do_put(self.image_path, self.remote_file_name)
+		try:
+			self.dropbox_client.do_put(self.image_path, self.remote_file_name)
+		except:
+			print img_path + " not found to upload"
 		print "done uploading " + self.image_path 
 		
 class DBClient():
@@ -50,18 +52,20 @@ class DBClient():
 		full_path = (self.current_path + "/" + to_path).decode(encoding)
 		self.api_client.put_file(full_path, from_file)
 
-class PiHandler(Daemon):
+class PiHandler():
 	def run(self):
 		self.db_client = DBClient()
 		self.is_running = True
-		schedule.every(10).seconds.do(self.capture_and_upload)
+		schedule.every(60).seconds.do(self.capture_and_upload)
 		while True:
 			schedule.run_pending()
 
 	def capture_and_upload(self):
+		print "capture and upload ..."
 		img_path, image_file = self.capture_image()
 		self.upload_image(self.db_client, img_path, image_file)
-		print "capture and upload ..."
+		self.delete_image(img_path)
+		
 
 	def capture_image(self):
 		print "capturing ..."
@@ -75,6 +79,13 @@ class PiHandler(Daemon):
 		uploader = Uploader(image_path, remote_file_name, dropbox_client)
 		uploader.start()
 		uploader.join()
+
+	def delete_image(self, image_path):
+		print "deleting file " + image_path
+		try:
+			os.remove(image_path)
+		except:
+			print image_path + " not found"
 	
 	def generate_file_name(self):
 		return "img_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".jpg"
@@ -82,18 +93,5 @@ class PiHandler(Daemon):
 if __name__ == "__main__":
 	# pi_handler = PiHandler()
 	# pi_handler.start()
-	daemon = PiHandler('/tmp/daemon-pi-camera.pid')
-	if len(sys.argv) == 2:
-		if 'start' == sys.argv[1]:
-			daemon.start()
-		elif 'stop' == sys.argv[1]:
-			daemon.stop()
-		elif 'restart' == sys.argv[1]:
-			daemon.restart()
-		else:
-			print "Unknown command"
-			sys.exit(2)
-		sys.exit(0)
-	else:
-		print "usage: %s start|stop|restart" % sys.argv[0]
-		sys.exit(2)
+	handler = PiHandler()
+	handler.run()

@@ -56,7 +56,7 @@ class PiHandler():
 	def run(self):
 		self.db_client = DBClient()
 		self.is_running = True
-		schedule.every(60).seconds.do(self.capture_and_upload)
+		schedule.every(10).seconds.do(self.capture_and_upload)
 		while True:
 			schedule.run_pending()
 
